@@ -3,51 +3,81 @@ package main
 import (
 	"fmt"
 	"sync"
-	"time"
+	"sync/atomic"
 )
 
-// Objetivo: Simular tareas que toman tiempo con time.Sleep y comparar
-// ejecución secuencial vs concurrente midiendo la duración total.
-// completa las secciones marcadas para observar la mejora.
+// Variante insegura (condición de carrera):
+func incrementarInseguro(nGoroutines, nIncrementos int) int64 {
+	var contador int64 = 0
 
-func tarea(id int, dur time.Duration) {
-	fmt.Printf("[tarea %d] iniciando, dur=%v\n", id, dur)
-	time.Sleep(dur)
-	fmt.Printf("[tarea %d] finalizada\n", id)
-}
-
-func secuencial(durs []time.Duration) time.Duration {
-	inicio := time.Now()
-	// Ejecutar las tareas en orden, sin goroutines
-	for i, d := range durs {
-		tarea(i, d)
-	}
-	return time.Since(inicio)
-}
-
-func concurrente(durs []time.Duration) time.Duration {
-	inicio := time.Now()
 	var wg sync.WaitGroup
-	for i, d := range durs {
-		wg.Add(1)
-		go func(id int, dur time.Duration) {
+	wg.Add(nGoroutines)
+
+	for i := 0; i < nGoroutines; i++ {
+		go func() {
 			defer wg.Done()
-			tarea(id, dur)
-		}(i, d)
+			for j := 0; j < nIncrementos; j++ {
+				// Operación NO atómica: Lectura + Incremento + Escritura
+				contador = contador + 1
+			}
+		}()
 	}
+
 	wg.Wait()
-	return time.Since(inicio)
+	return contador
+}
+
+// Variante con Mutex:
+func incrementarConMutex(nGoroutines, nIncrementos int) int64 {
+	var contador int64 = 0
+	var wg sync.WaitGroup
+	var mu sync.Mutex // El cerrojo (Lock)
+
+	wg.Add(nGoroutines)
+
+	for i := 0; i < nGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < nIncrementos; j++ {
+				mu.Lock()         // Entra a la sección crítica
+				contador = contador + 1
+				mu.Unlock()       // Sale de la sección crítica
+			}
+		}()
+	}
+
+	wg.Wait()
+	return contador
+}
+
+// Variante con atomic:
+func incrementarConAtomic(nGoroutines, nIncrementos int) int64 {
+	var contador int64 = 0
+	var wg sync.WaitGroup
+
+	wg.Add(nGoroutines)
+
+	for i := 0; i < nGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < nIncrementos; j++ {
+				// Operación atómica a nivel de CPU
+				atomic.AddInt64(&contador, 1)
+			}
+		}()
+	}
+
+	wg.Wait()
+	return contador
 }
 
 func main() {
-	// experimenta con diferentes duraciones
-	durs := []time.Duration{700 * time.Millisecond, 500 * time.Millisecond, 1 * time.Second}
+	// Aumentamos los valores para que la race condition sea más evidente
+	nGoroutines := 10
+	nIncrementos := 100_000
 
-	d1 := secuencial(durs)
-	fmt.Println("Duración SEC:", d1)
+	fmt.Printf("Configuración: %d goroutines, %d incrementos cada una\n", nGoroutines, nIncrementos)
+	fmt.Printf("Esperado correcto: %d\n\n", int64(nGoroutines*nIncrementos))
 
-	d2 := concurrente(durs)
-	fmt.Println("Duración CONC:", d2)
-
-	fmt.Println("Nota: la ejecución concurrente debería ser ~max(durs). Cambia valores y observa.")
-}
+	fmt.Println("=== Variante INSEGURA:")
+	res1 := incrementarInseguro(nGoroutines, nIncrementos)

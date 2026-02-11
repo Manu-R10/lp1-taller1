@@ -21,10 +21,10 @@ func incrementarInseguro(nGoroutines, nIncrementos int) int64 {
 	for i := 0; i < nGoroutines; i++ {
 		go func() {
 			// TODO: asegura wg.Done() se ejecuta al final
-
+    defer wg.Done()
 			for j := 0; j < nIncrementos; j++ {
 				// TODO: incrementar de manera NO atómica (contador = contador + 1)
-
+        atomic.AddInt64(&contador, 1)
 			}
 		}()
 	}
@@ -36,8 +36,8 @@ func incrementarInseguro(nGoroutines, nIncrementos int) int64 {
 // Variante con Mutex:
 func incrementarConMutex(nGoroutines, nIncrementos int) int64 {
 	var contador int64 = 0
-	// var mu 
-	// var wg 
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 	wg.Add(nGoroutines)
 
 	for i := 0; i < nGoroutines; i++ {
@@ -45,7 +45,9 @@ func incrementarConMutex(nGoroutines, nIncrementos int) int64 {
 			defer wg.Done()
 			for j := 0; j < nIncrementos; j++ {
 				// TODO: proteger la sección crítica con mu.Lock()/mu.Unlock()
-
+           mu.Lock()
+		   contador++
+		   mu.Unlock()
 			}
 		}()
 	}
@@ -65,7 +67,7 @@ func incrementarConAtomic(nGoroutines, nIncrementos int) int64 {
 			defer wg.Done()
 			for j := 0; j < nIncrementos; j++ {
 				// TODO: usar atomic.AddInt64(&contador, 1)
-
+           atomic.AddInt64(&contador, 1)
 			}
 		}()
 	}
