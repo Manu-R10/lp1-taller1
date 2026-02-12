@@ -9,7 +9,7 @@ import (
 // Objetivo: Provocar un deadlock con dos mutex y dos goroutines que adquieren
 // recursos en orden distinto. Luego evitarlo imponiendo un orden global.
 // NOTA: La versión con deadlock se quedará bloqueada: ejecútala, observa y luego cambia a la versión segura.
-// TODO: completa/activa la sección que quieras probar.
+// TODO: ✓
 
 func deadlock() {
 	var mu1, mu2 sync.Mutex
@@ -19,24 +19,28 @@ func deadlock() {
 	go func() {
 		defer wg.Done()
 		fmt.Println("G1: Lock mu1") 
-		// TODO: adquirir mu1
-
+		// TODO: ✓
+        mu1.Lock()
+        defer mu1.Unlock()
 		time.Sleep(100 * time.Millisecond) // fuerza entrelazado
 		fmt.Println("G1: Lock mu2") 
-		// TODO: adquirir mu2
-
+		// TODO: ✓
+        mu2.Lock()
+        defer mu2.Unlock()
 		fmt.Println("G1: listo")
 	}()
 
 	go func() {
 		defer wg.Done()
 		fmt.Println("G2: Lock mu2") 
-		// TODO: adquirir mu2
-
+		// TODO: ✓
+        mu2.Lock()
+        defer mu2.Unlock()
 		time.Sleep(100 * time.Millisecond)
 		fmt.Println("G2: Lock mu1") 
-		// TODO: adquirir mu1
-
+		// TODO:✓
+        mu1.Lock()
+        defer mu1.Unlock()
 		fmt.Println("G2: listo")
 	}()
 
@@ -53,13 +57,15 @@ func seguroOrdenado() {
 	lockEnOrden := func(a, b *sync.Mutex) func() func() {
 		// retorna: lock():unlock()
 		return func() func() {
-			// TODO: adquirir a luego b
-
+			// TODO: ✓
+            a.Lock()
+            b.Lock()
 			return func() {
-				// TODO: liberar b luego a
-
+				// TODO: ✓
+            b.Unlock()
+            a.Unlock()
 			}
-		}
+	}
 	}
 
 	go func() {
@@ -76,6 +82,7 @@ func seguroOrdenado() {
 		defer unlock()
 		fmt.Println("G2: trabajo con mu1->mu2")
 		time.Sleep(100 * time.Millisecond)
+		
 	}()
 
 	wg.Wait()
@@ -84,8 +91,8 @@ func seguroOrdenado() {
 
 func main() {
 	fmt.Println("=== Elige una sección para ejecutar ===")
-	// TODO: comenta/activa la versión que desees probar
+	// TODO:✓
 
-	// deadlock()      // <- provocará interbloqueo
-	seguroOrdenado()   // <- versión segura
+	deadlock()      // <- provocará interbloqueo
+	//seguroOrdenado()   // <- versión segura
 }
